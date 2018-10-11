@@ -148,29 +148,16 @@ func (s *Server) callback() http.HandlerFunc {
 		}
 
 		verifier := s.oidcProvider.Verifier(&oidc.Config{
-			ClientID: s.opts.Resource,
+			ClientID: s.opts.ClientId,
 		})
-		accessToken, err := verifier.Verify(s.ctx, accessResp.AccessToken)
+		_, err = verifier.Verify(s.ctx, accessResp.Extra("id_token").(string))
 		if err != nil {
-			s.log.Error("Invalid access token", zap.Error(err))
-			http.Error(w, "Invalid access token", http.StatusInternalServerError)
+			s.log.Error("Invalid id token", zap.Error(err))
+			http.Error(w, "Invalid id token", http.StatusInternalServerError)
 			return
 		}
 
-		var claims struct {
-			Name string `json:"name"`
-			OID  string `json:"oid"`
-		}
-		if err = accessToken.Claims(&claims); err != nil {
-			s.log.Error("Malformed claims", zap.Error(err))
-			http.Error(w, "Malformed claims", http.StatusInternalServerError)
-			return
-		}
-
-		s.log.Info("id token in access resp", zap.String("idToken", accessResp.Extra("id_token").(string)))
-		s.log.Info("access token in access resp", zap.String("accessToken", accessResp.AccessToken))
-		s.log.Info("claims", zap.String("name", claims.Name), zap.String("oid", claims.OID))
-
+		session.Set("id", accessResp.Extra("id_token").(string), accessResp.Expiry)
 		session.Set("access", accessResp.AccessToken, accessResp.Expiry)
 
 		http.Redirect(w, req, "/", http.StatusTemporaryRedirect)
@@ -180,6 +167,22 @@ func (s *Server) callback() http.HandlerFunc {
 func (s *Server) index() http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		session := s.getSessionStore(w, req)
+		verifier := s.oidcProvider.Verifier(&oidc.Config{
+			ClientID: s.opts.ClientId,
+		})
+
+		id, err := session.Get("id")
+		if err != nil {
+			s.log.Info("Cannot find id token in session. Redirect to auth page.", zap.Error(err))
+			http.Redirect(w, req, "/oauth/authorize", http.StatusTemporaryRedirect)
+			return
+		}
+		idToken, err := verifier.Verify(s.ctx, id)
+		if err != nil {
+			s.log.Info("Invalid id token in session. Redirect to auth page.", zap.Error(err))
+			http.Redirect(w, req, "/oauth/authorize", http.StatusTemporaryRedirect)
+			return
+		}
 
 		access, err := session.Get("access")
 		if err != nil {
@@ -188,17 +191,26 @@ func (s *Server) index() http.HandlerFunc {
 			return
 		}
 
-		verifier := s.oidcProvider.Verifier(&oidc.Config{
-			ClientID: s.opts.Resource,
-		})
-		_, err = verifier.Verify(s.ctx, access)
+		if s.opts.UpstreamAccessToken != "" {
+			req.Header.Add("Authorization", "Bearer "+s.opts.UpstreamAccessToken)
+		} else {
+			req.Header.Add("Authorization", "Bearer "+access)
+		}
+
+		userContext, err := ParseUserContext(s.opts, idToken)
 		if err != nil {
-			s.log.Info("Invalid access token in session. Redirect to auth page.", zap.Error(err))
-			http.Redirect(w, req, "/oauth/authorize", http.StatusTemporaryRedirect)
+			s.log.Error("Malformed claims", zap.Error(err))
+			http.Error(w, "Malformed claims", http.StatusForbidden)
 			return
 		}
 
-		req.Header.Add("Authorization", "Bearer "+access)
+		if s.opts.EnableImpersonation {
+			req.Header.Add("Impersonate-User", userContext.UserName)
+			for _, group := range userContext.Groups {
+				s.log.Info("groups", zap.String("group", group))
+				req.Header.Add("Impersonate-Group", group)
+			}
+		}
 
 		s.proxy.ServeHTTP(w, req)
 	}
