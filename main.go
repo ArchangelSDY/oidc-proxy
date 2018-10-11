@@ -11,6 +11,7 @@ type Options struct {
 	IssuerURL    string `long:"issuer-url"`
 	Resource     string `long:"resource"`
 	RedirectURL  string `long:"redirect-url"`
+	UpstreamURL  string `long:"upstream-url"`
 }
 
 func main() {

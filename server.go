@@ -2,7 +2,11 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"net"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"time"
 
 	"github.com/coreos/go-oidc"
@@ -30,6 +34,7 @@ type Server struct {
 	httpClient   *http.Client
 	oidcProvider *oidc.Provider
 	oauthCfg     *oauth2.Config
+	proxy        *httputil.ReverseProxy
 }
 
 func NewServer(opts *Options, logger *zap.Logger) (*Server, error) {
@@ -52,6 +57,27 @@ func NewServer(opts *Options, logger *zap.Logger) (*Server, error) {
 		Scopes:       []string{"openid", "profile", "email"},
 	}
 
+	upstreamURL, err := url.Parse(opts.UpstreamURL)
+	if err != nil {
+		return nil, err
+	}
+	proxy := httputil.NewSingleHostReverseProxy(upstreamURL)
+	proxy.Transport = &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true, // TODO
+		},
+	}
+
 	return &Server{
 		opts:         opts,
 		log:          logger,
@@ -59,6 +85,7 @@ func NewServer(opts *Options, logger *zap.Logger) (*Server, error) {
 		httpClient:   httpClient,
 		oidcProvider: oidcProvider,
 		oauthCfg:     oauthCfg,
+		proxy:        proxy,
 	}, nil
 }
 
@@ -150,7 +177,7 @@ func (s *Server) callback() http.HandlerFunc {
 	}
 }
 
-func (s *Server) proxy() http.HandlerFunc {
+func (s *Server) index() http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		session := s.getSessionStore(w, req)
 
@@ -171,8 +198,9 @@ func (s *Server) proxy() http.HandlerFunc {
 			return
 		}
 
-		s.log.Info("OK")
+		req.Header.Add("Authorization", "Bearer "+access)
 
+		s.proxy.ServeHTTP(w, req)
 	}
 }
 
@@ -180,6 +208,6 @@ func (s *Server) Listen() error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/oauth/authorize", s.authorize())
 	mux.HandleFunc("/oauth/callback", s.callback())
-	mux.HandleFunc("/", s.proxy())
+	mux.HandleFunc("/", s.index())
 	return http.ListenAndServe(":3000", mux)
 }
