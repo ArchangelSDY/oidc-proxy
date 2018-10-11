@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"time"
 
 	"github.com/coreos/go-oidc"
+	"github.com/satori/go.uuid"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 )
@@ -62,13 +62,23 @@ func NewServer(opts *Options, logger *zap.Logger) (*Server, error) {
 	}, nil
 }
 
-func (s *Server) login() http.HandlerFunc {
+func (s *Server) getSessionStore(w http.ResponseWriter, req *http.Request) SessionStore {
+	return &CookieStore{req, w}
+}
+
+func (s *Server) authorize() http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		redirectUrl := s.oauthCfg.AuthCodeURL("state",
+		session := s.getSessionStore(w, req)
+
+		state := uuid.NewV4().String()
+		if err := session.Set("state", state, time.Time{}); err != nil {
+			http.Error(w, "Fail to save state", http.StatusInternalServerError)
+			return
+		}
+
+		redirectUrl := s.oauthCfg.AuthCodeURL(state,
 			oauth2.SetAuthURLParam("resource", s.opts.Resource),
 			oauth2.SetAuthURLParam("response_type", "code"),
-			oauth2.SetAuthURLParam("response_mode", "query"),
-			oauth2.SetAuthURLParam("nonce", "aaabbbccc"),
 		)
 		http.Redirect(w, req, redirectUrl, http.StatusTemporaryRedirect)
 	}
@@ -76,6 +86,14 @@ func (s *Server) login() http.HandlerFunc {
 
 func (s *Server) callback() http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		session := s.getSessionStore(w, req)
+		state, err := session.Get("state")
+		if err != nil {
+			s.log.Warn("State not found", zap.Error(err))
+			http.Error(w, "State not found", http.StatusForbidden)
+			return
+		}
+
 		query := req.URL.Query()
 		errCode := query.Get("error")
 
@@ -88,10 +106,12 @@ func (s *Server) callback() http.HandlerFunc {
 			return
 		}
 
-		code := query.Get("code")
-		state := query.Get("state")
+		if state != query.Get("state") {
+			http.Error(w, "Invalid state", http.StatusForbidden)
+			return
+		}
 
-		s.log.Info("Auth callback", zap.String("id_token", query.Get("id_token")), zap.String("code", code), zap.String("state", state))
+		code := query.Get("code")
 
 		accessResp, err := s.oauthCfg.Exchange(s.ctx, code)
 		if err != nil {
@@ -103,10 +123,10 @@ func (s *Server) callback() http.HandlerFunc {
 		verifier := s.oidcProvider.Verifier(&oidc.Config{
 			ClientID: s.opts.Resource,
 		})
-		idToken, err := verifier.Verify(s.ctx, accessResp.AccessToken)
+		accessToken, err := verifier.Verify(s.ctx, accessResp.AccessToken)
 		if err != nil {
-			s.log.Error("Invalid id token", zap.Error(err))
-			http.Error(w, "Invalid id token", http.StatusInternalServerError)
+			s.log.Error("Invalid access token", zap.Error(err))
+			http.Error(w, "Invalid access token", http.StatusInternalServerError)
 			return
 		}
 
@@ -114,22 +134,52 @@ func (s *Server) callback() http.HandlerFunc {
 			Name string `json:"name"`
 			OID  string `json:"oid"`
 		}
-		if err = idToken.Claims(&claims); err != nil {
+		if err = accessToken.Claims(&claims); err != nil {
 			s.log.Error("Malformed claims", zap.Error(err))
 			http.Error(w, "Malformed claims", http.StatusInternalServerError)
 			return
 		}
 
+		s.log.Info("id token in access resp", zap.String("idToken", accessResp.Extra("id_token").(string)))
+		s.log.Info("access token in access resp", zap.String("accessToken", accessResp.AccessToken))
 		s.log.Info("claims", zap.String("name", claims.Name), zap.String("oid", claims.OID))
 
-		encoder := json.NewEncoder(w)
-		encoder.Encode(accessResp)
+		session.Set("access", accessResp.AccessToken, accessResp.Expiry)
+
+		http.Redirect(w, req, "/", http.StatusTemporaryRedirect)
+	}
+}
+
+func (s *Server) proxy() http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		session := s.getSessionStore(w, req)
+
+		access, err := session.Get("access")
+		if err != nil {
+			s.log.Info("Cannot find access token in session. Redirect to auth page.", zap.Error(err))
+			http.Redirect(w, req, "/oauth/authorize", http.StatusTemporaryRedirect)
+			return
+		}
+
+		verifier := s.oidcProvider.Verifier(&oidc.Config{
+			ClientID: s.opts.Resource,
+		})
+		_, err = verifier.Verify(s.ctx, access)
+		if err != nil {
+			s.log.Info("Invalid access token in session. Redirect to auth page.", zap.Error(err))
+			http.Redirect(w, req, "/oauth/authorize", http.StatusTemporaryRedirect)
+			return
+		}
+
+		s.log.Info("OK")
+
 	}
 }
 
 func (s *Server) Listen() error {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/oauth/login", s.login())
+	mux.HandleFunc("/oauth/authorize", s.authorize())
 	mux.HandleFunc("/oauth/callback", s.callback())
+	mux.HandleFunc("/", s.proxy())
 	return http.ListenAndServe(":3000", mux)
 }
