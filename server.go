@@ -204,11 +204,13 @@ func (s *Server) index() http.HandlerFunc {
 			return
 		}
 
-		if s.opts.EnableImpersonation {
-			req.Header.Add("Impersonate-User", userContext.UserName)
+		for _, header := range s.opts.UpstreamUserHeader {
+			req.Header.Add(header, userContext.UserName)
+		}
+
+		for _, header := range s.opts.UpstreamGroupHeader {
 			for _, group := range userContext.Groups {
-				s.log.Info("groups", zap.String("group", group))
-				req.Header.Add("Impersonate-Group", group)
+				req.Header.Add(header, group)
 			}
 		}
 

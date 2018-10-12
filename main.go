@@ -6,18 +6,19 @@ import (
 )
 
 type Options struct {
-	ClientId            string `long:"client-id"`
-	ClientSecret        string `long:"client-secret"`
-	IssuerURL           string `long:"issuer-url"`
-	Resource            string `long:"resource"`
-	RedirectURL         string `long:"redirect-url"`
-	UpstreamURL         string `long:"upstream-url"`
-	UpstreamAccessToken string `long:"upstream-access-token"`
-	UserPrefix          string `long:"user-prefix"`
-	UserClaim           string `long:"user-claim"`
-	GroupsPrefix        string `long:"group-prefix"`
-	GroupsClaim         string `long:"groups-claim"`
-	EnableImpersonation bool   `long:"enable-impersonation"`
+	ClientId            string   `long:"client-id"`
+	ClientSecret        string   `long:"client-secret"`
+	IssuerURL           string   `long:"issuer-url"`
+	Resource            string   `long:"resource"`
+	RedirectURL         string   `long:"redirect-url"`
+	UpstreamURL         string   `long:"upstream-url"`
+	UpstreamAccessToken string   `long:"upstream-access-token"`
+	UpstreamUserHeader  []string `long:"upstream-user-header"`
+	UpstreamGroupHeader []string `long:"upstream-group-header"`
+	UserPrefix          string   `long:"user-prefix"`
+	UserClaim           string   `long:"user-claim"`
+	GroupsPrefix        string   `long:"group-prefix"`
+	GroupsClaim         string   `long:"groups-claim"`
 }
 
 func main() {
