@@ -8,10 +8,10 @@ import (
 )
 
 type Options struct {
+	Listen                string   `long:"listen"`
 	ClientId              string   `long:"client-id"`
 	ClientSecret          string   `long:"client-secret"`
 	IssuerURL             string   `long:"issuer-url"`
-	Resource              string   `long:"resource"`
 	RedirectURL           string   `long:"redirect-url"`
 	TLSCertFile           string   `long:"tls-cert"`
 	TLSKeyFile            string   `long:"tls-key"`
@@ -23,7 +23,7 @@ type Options struct {
 	UpstreamGroupHeader   []string `long:"upstream-group-header"`
 	UserPrefix            string   `long:"user-prefix"`
 	UserClaim             string   `long:"user-claim"`
-	GroupsPrefix          string   `long:"group-prefix"`
+	GroupsPrefix          string   `long:"groups-prefix"`
 	GroupsClaim           string   `long:"groups-claim"`
 }
 
@@ -70,7 +70,7 @@ func main() {
 		logger.Fatal("Fail to initialize server", zap.Error(err))
 	}
 
-	if err = server.Listen(); err != nil {
+	if err = server.Listen(opts.Listen); err != nil {
 		logger.Fatal("Fail to serve", zap.Error(err))
 	}
 }

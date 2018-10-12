@@ -118,10 +118,8 @@ func (s *Server) authorize() http.HandlerFunc {
 			return
 		}
 
-		redirectUrl := s.oauthCfg.AuthCodeURL(state,
-			oauth2.SetAuthURLParam("resource", s.opts.Resource),
-			oauth2.SetAuthURLParam("response_type", "code"),
-		)
+		redirectUrl := s.oauthCfg.AuthCodeURL(state)
+
 		http.Redirect(w, req, redirectUrl, http.StatusTemporaryRedirect)
 	}
 }
@@ -233,15 +231,15 @@ func (s *Server) index() http.HandlerFunc {
 	}
 }
 
-func (s *Server) Listen() error {
+func (s *Server) Listen(addr string) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/oauth/authorize", s.authorize())
 	mux.HandleFunc("/oauth/callback", s.callback())
 	mux.HandleFunc("/", s.index())
 
 	if s.opts.TLSCertFile != "" && s.opts.TLSKeyFile != "" {
-		return http.ListenAndServeTLS(":3000", s.opts.TLSCertFile, s.opts.TLSKeyFile, mux)
+		return http.ListenAndServeTLS(addr, s.opts.TLSCertFile, s.opts.TLSKeyFile, mux)
 	} else {
-		return http.ListenAndServe(":3000", mux)
+		return http.ListenAndServe(addr, mux)
 	}
 }
