@@ -191,8 +191,8 @@ func (s *Server) index() http.HandlerFunc {
 			return
 		}
 
-		if s.opts.UpstreamAccessToken != "" {
-			req.Header.Add("Authorization", "Bearer "+s.opts.UpstreamAccessToken)
+		if s.opts.UpstreamAuthToken != "" {
+			req.Header.Add("Authorization", "Bearer "+s.opts.UpstreamAuthToken)
 		} else {
 			req.Header.Add("Authorization", "Bearer "+access)
 		}
