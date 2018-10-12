@@ -11,6 +11,8 @@ type Options struct {
 	IssuerURL           string   `long:"issuer-url"`
 	Resource            string   `long:"resource"`
 	RedirectURL         string   `long:"redirect-url"`
+	TLSCertFile         string   `long:"tls-cert"`
+	TLSKeyFile          string   `long:"tls-key"`
 	UpstreamURL         string   `long:"upstream-url"`
 	UpstreamAccessToken string   `long:"upstream-access-token"`
 	UpstreamUserHeader  []string `long:"upstream-user-header"`

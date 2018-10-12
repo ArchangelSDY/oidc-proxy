@@ -223,5 +223,10 @@ func (s *Server) Listen() error {
 	mux.HandleFunc("/oauth/authorize", s.authorize())
 	mux.HandleFunc("/oauth/callback", s.callback())
 	mux.HandleFunc("/", s.index())
-	return http.ListenAndServe(":3000", mux)
+
+	if s.opts.TLSCertFile != "" && s.opts.TLSKeyFile != "" {
+		return http.ListenAndServeTLS(":3000", s.opts.TLSCertFile, s.opts.TLSKeyFile, mux)
+	} else {
+		return http.ListenAndServe(":3000", mux)
+	}
 }
