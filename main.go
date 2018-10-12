@@ -15,9 +15,10 @@ type Options struct {
 	RedirectURL           string   `long:"redirect-url"`
 	TLSCertFile           string   `long:"tls-cert"`
 	TLSKeyFile            string   `long:"tls-key"`
+	SessionEncryptionKey  string   `long:"session-encryption-key"`
 	UpstreamURL           string   `long:"upstream-url"`
 	UpstreamAuthTokenFile string   `long:"upstream-auth-token-file"`
-	UpstreamAuthToken     string   `no-flag`
+	UpstreamAuthToken     string   `no-flag:"-"`
 	UpstreamUserHeader    []string `long:"upstream-user-header"`
 	UpstreamGroupHeader   []string `long:"upstream-group-header"`
 	UserPrefix            string   `long:"user-prefix"`
@@ -56,6 +57,10 @@ func main() {
 		} else {
 			logger.Fatal("Fail to parse flags", zap.Error(err))
 		}
+	}
+
+	if opts.SessionEncryptionKey == "" {
+		logger.Warn("Session is not encrypted. Should only use this in dev environment.")
 	}
 
 	logger.Info("Listening...")

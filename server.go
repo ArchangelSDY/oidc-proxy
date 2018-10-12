@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -35,6 +36,7 @@ type Server struct {
 	oidcProvider *oidc.Provider
 	oauthCfg     *oauth2.Config
 	proxy        *httputil.ReverseProxy
+	sessEncKey   []byte
 }
 
 func NewServer(opts *Options, logger *zap.Logger) (*Server, error) {
@@ -78,6 +80,14 @@ func NewServer(opts *Options, logger *zap.Logger) (*Server, error) {
 		},
 	}
 
+	var sessEncKey []byte
+	if opts.SessionEncryptionKey != "" {
+		sessEncKey, err = base64.URLEncoding.DecodeString(opts.SessionEncryptionKey)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &Server{
 		opts:         opts,
 		log:          logger,
@@ -86,11 +96,16 @@ func NewServer(opts *Options, logger *zap.Logger) (*Server, error) {
 		oidcProvider: oidcProvider,
 		oauthCfg:     oauthCfg,
 		proxy:        proxy,
+		sessEncKey:   sessEncKey,
 	}, nil
 }
 
 func (s *Server) getSessionStore(w http.ResponseWriter, req *http.Request) SessionStore {
-	return &CookieStore{req, w}
+	var store SessionStore = &CookieStore{req, w}
+	if len(s.sessEncKey) > 0 {
+		store = &EncryptedStore{s.sessEncKey, store}
+	}
+	return store
 }
 
 func (s *Server) authorize() http.HandlerFunc {
