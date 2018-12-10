@@ -1,43 +1,31 @@
 package main
 
 import (
-	"io/ioutil"
-
 	flags "github.com/jessevdk/go-flags"
 	"go.uber.org/zap"
 )
 
 type Options struct {
-	Listen                string   `long:"listen"`
-	ClientId              string   `long:"client-id"`
-	ClientSecret          string   `long:"client-secret"`
-	IssuerURL             string   `long:"issuer-url"`
-	RedirectURL           string   `long:"redirect-url"`
-	TLSCertFile           string   `long:"tls-cert"`
-	TLSKeyFile            string   `long:"tls-key"`
-	SessionEncryptionKey  string   `long:"session-encryption-key"`
-	UpstreamURL           string   `long:"upstream-url"`
-	UpstreamAuthTokenFile string   `long:"upstream-auth-token-file"`
-	UpstreamAuthToken     string   `no-flag:"-"`
-	UpstreamUserHeader    []string `long:"upstream-user-header"`
-	UpstreamGroupHeader   []string `long:"upstream-group-header"`
-	UserPrefix            string   `long:"user-prefix"`
-	UserClaim             string   `long:"user-claim"`
-	GroupsPrefix          string   `long:"groups-prefix"`
-	GroupsClaim           string   `long:"groups-claim"`
+	Listen               string   `long:"listen"`
+	ClientId             string   `long:"client-id"`
+	ClientSecret         string   `long:"client-secret"`
+	IssuerURL            string   `long:"issuer-url"`
+	RedirectURL          string   `long:"redirect-url"`
+	TLSCertFile          string   `long:"tls-cert"`
+	TLSKeyFile           string   `long:"tls-key"`
+	SessionEncryptionKey string   `long:"session-encryption-key"`
+	UpstreamURL          string   `long:"upstream-url"`
+	UpstreamUserHeader   []string `long:"upstream-user-header"`
+	UpstreamGroupHeader  []string `long:"upstream-group-header"`
+	UserPrefix           string   `long:"user-prefix"`
+	UserClaim            string   `long:"user-claim"`
+	GroupsPrefix         string   `long:"groups-prefix"`
+	GroupsClaim          string   `long:"groups-claim"`
 }
 
 func (opts *Options) Parse() error {
 	if _, err := flags.Parse(opts); err != nil {
 		return err
-	}
-
-	if opts.UpstreamAuthTokenFile != "" {
-		upstreamTokenBytes, err := ioutil.ReadFile(opts.UpstreamAuthTokenFile)
-		if err != nil {
-			return err
-		}
-		opts.UpstreamAuthToken = string(upstreamTokenBytes)
 	}
 
 	return nil

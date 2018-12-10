@@ -196,11 +196,7 @@ func (s *Server) index() http.HandlerFunc {
 			return
 		}
 
-		if s.opts.UpstreamAuthToken != "" {
-			req.Header.Add("Authorization", "Bearer "+s.opts.UpstreamAuthToken)
-		} else {
-			req.Header.Add("Authorization", "Bearer "+id)
-		}
+		req.Header.Add("Authorization", "Bearer "+id)
 
 		userContext, err := ParseUserContext(s.opts, idToken)
 		if err != nil {
