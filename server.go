@@ -171,7 +171,6 @@ func (s *Server) callback() http.HandlerFunc {
 		}
 
 		session.Set("id", accessResp.Extra("id_token").(string), accessResp.Expiry)
-		session.Set("access", accessResp.AccessToken, accessResp.Expiry)
 
 		http.Redirect(w, req, "/", http.StatusTemporaryRedirect)
 	}
@@ -197,17 +196,10 @@ func (s *Server) index() http.HandlerFunc {
 			return
 		}
 
-		access, err := session.Get("access")
-		if err != nil {
-			s.log.Info("Cannot find access token in session. Redirect to auth page.", zap.Error(err))
-			http.Redirect(w, req, "/oauth/authorize", http.StatusTemporaryRedirect)
-			return
-		}
-
 		if s.opts.UpstreamAuthToken != "" {
 			req.Header.Add("Authorization", "Bearer "+s.opts.UpstreamAuthToken)
 		} else {
-			req.Header.Add("Authorization", "Bearer "+access)
+			req.Header.Add("Authorization", "Bearer "+id)
 		}
 
 		userContext, err := ParseUserContext(s.opts, idToken)
