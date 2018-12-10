@@ -101,7 +101,7 @@ func NewServer(opts *Options, logger *zap.Logger) (*Server, error) {
 }
 
 func (s *Server) getSessionStore(w http.ResponseWriter, req *http.Request) SessionStore {
-	var store SessionStore = &CookieStore{req, w}
+	var store SessionStore = &CookieStore{req, w, s.opts.SecureCookie}
 	if len(s.sessEncKey) > 0 {
 		store = &EncryptedStore{s.sessEncKey, store}
 	}

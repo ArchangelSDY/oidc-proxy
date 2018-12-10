@@ -17,8 +17,9 @@ type SessionStore interface {
 }
 
 type CookieStore struct {
-	req *http.Request
-	w   http.ResponseWriter
+	req    *http.Request
+	w      http.ResponseWriter
+	secure bool
 }
 
 func (s *CookieStore) Get(key string) (string, error) {
@@ -36,7 +37,7 @@ func (s *CookieStore) Set(key, value string, expiry time.Time) error {
 		Path:     "/",
 		HttpOnly: true,
 		Expires:  expiry,
-		// TODO: Secure: true,
+		Secure:   s.secure,
 	})
 	return nil
 }

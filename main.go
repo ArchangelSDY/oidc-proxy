@@ -14,6 +14,7 @@ type Options struct {
 	TLSCertFile          string   `long:"tls-cert"`
 	TLSKeyFile           string   `long:"tls-key"`
 	SessionEncryptionKey string   `long:"session-encryption-key"`
+	SecureCookie         bool     `long:"secure-cookie"`
 	UpstreamURL          string   `long:"upstream-url"`
 	UpstreamUserHeader   []string `long:"upstream-user-header"`
 	UpstreamGroupHeader  []string `long:"upstream-group-header"`
