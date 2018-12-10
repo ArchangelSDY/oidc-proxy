@@ -16,18 +16,6 @@ import (
 	"golang.org/x/oauth2"
 )
 
-type apiVersionRoundTripper struct {
-	proxied    http.RoundTripper
-	apiVersion string
-}
-
-func (t *apiVersionRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	query := req.URL.Query()
-	query.Add("api-version", t.apiVersion)
-	req.URL.RawQuery = query.Encode()
-	return t.proxied.RoundTrip(req)
-}
-
 type Server struct {
 	opts         *Options
 	log          *zap.Logger
@@ -41,8 +29,7 @@ type Server struct {
 
 func NewServer(opts *Options, logger *zap.Logger) (*Server, error) {
 	httpClient := &http.Client{
-		Transport: &apiVersionRoundTripper{http.DefaultTransport, "1.0"},
-		Timeout:   time.Minute,
+		Timeout: time.Minute,
 	}
 
 	ctx := oidc.ClientContext(context.Background(), httpClient)
@@ -76,7 +63,7 @@ func NewServer(opts *Options, logger *zap.Logger) (*Server, error) {
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true, // TODO
+			InsecureSkipVerify: opts.SkipVerifyUpstreamTLS,
 		},
 	}
 
